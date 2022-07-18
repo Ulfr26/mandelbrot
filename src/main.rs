@@ -97,7 +97,7 @@ fn mandelbrot(re: f64, im: f64, max_iterations: i32) -> u8 {
     ((iterations as f32 / max_iterations as f32) * 255.0) as u8
 }
 
-fn pixel_to_real(pixel: (i32, i32), dim: [f64; 2], pos: [f64; 2]) -> (f64, f64) {
+fn pixel_to_real(pixel: (i32, i32), dim: &[f64; 2], pos: &[f64; 2]) -> (f64, f64) {
     let res = (
         ((pixel.0 - (WIDTH / 2)) as f64) / WIDTH as f64,
         ((pixel.1 - (HEIGHT/ 2)) as f64) / HEIGHT as f64
@@ -112,35 +112,35 @@ fn main() {
         .title("mandelbrot")
         .build();
 
-    let mut c = Camera::default();
+    let mut camera = Camera::default();
 
     let pallette: Vec<Color> = (0..256).map(|x| {
         Color::color_from_hsv(HUE, 1., x as f32 / 255.0)
     }).collect();
 
     while !rl.window_should_close() {
-        c.update(&rl);
+        camera.update(&rl);
 
         let canvas = (0..HEIGHT)
             .cartesian_product(0..WIDTH)
             .collect_vec()
             .into_par_iter()
-            .map(|(x, y)| pixel_to_real((y, x), c.dim, c.pos)).into_par_iter()
-            .map(|(x, y)| mandelbrot(x, y, c.iterations))
+            .map(|(x, y)| pixel_to_real((y, x), &camera.dim, &camera.pos))
+            .map(|(x, y)| mandelbrot(x, y, camera.iterations))
             .collect::<Vec<u8>>();
 
-        let mut d = rl.begin_drawing(&thread);
+        let mut draw_handle = rl.begin_drawing(&thread);
 
         for j in 0..HEIGHT {
             for i in 0..WIDTH {
                 let level = canvas[(j * WIDTH + i) as usize] as usize;
                 let col = pallette[level];
-                d.draw_pixel(i, j, col);
+                draw_handle.draw_pixel(i, j, col);
             }
         }
 
-        d.draw_text(&format!("Iterations: {}", c.iterations), 10, 10, 30,
+        draw_handle.draw_text(&format!("Iterations: {}", camera.iterations), 10, 10, 30,
                     Color::WHITE);
-        d.draw_fps(WIDTH - 100, 10);
+        draw_handle.draw_fps(WIDTH - 100, 10);
     }
 }
