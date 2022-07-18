@@ -1,5 +1,6 @@
+use itertools::Itertools;
 use raylib::prelude::*;
-use std::thread::{self, JoinHandle};
+use rayon::prelude::*;
 
 // Default values
 const HUE: f32 = 252.;
@@ -11,10 +12,6 @@ const MAX_ITERATIONS: i32 = 64;
 const SPEED: f64 = 200.0;
 const ZOOM: f64 = 0.9; // Sheogorath!
 const ITER_SPEED: i32 = 64; // Add this many iterations per button press
-const NO_THREADS: usize = 64;
-
-const SIZE: usize = (WIDTH * HEIGHT) as usize;
-const T_SIZE: usize = SIZE / NO_THREADS;
 
 // Represents the position of the camera, and the dimensions of the viewport
 // (in the complex plane, not in pixel space)
@@ -100,24 +97,13 @@ fn mandelbrot(re: f64, im: f64, max_iterations: i32) -> u8 {
     ((iterations as f32 / max_iterations as f32) * 255.0) as u8
 }
 
-fn calc_range(index: i32, iterations: i32, dim: [f64; 2], pos: [f64; 2]) -> [u8; T_SIZE] {
-    let row_size = HEIGHT / NO_THREADS as i32;
-    let mut result = [0; T_SIZE];
+fn pixel_to_real(pixel: (i32, i32), dim: [f64; 2], pos: [f64; 2]) -> (f64, f64) {
+    let res = (
+        ((pixel.0 - (WIDTH / 2)) as f64) / WIDTH as f64,
+        ((pixel.1 - (HEIGHT/ 2)) as f64) / HEIGHT as f64
+    );
 
-    for j in 0..row_size {
-        let jj = j + index * row_size;
-        let y = ((jj - (HEIGHT / 2)) as f64) / HEIGHT as f64;
-        let y = y * dim[1] + pos[1];
-
-        for i in 0..WIDTH {
-            let x = ((i - (WIDTH / 2)) as f64) / WIDTH as f64;
-            let x = x * dim[0] + pos[0];
-
-            result[(j * WIDTH + i) as usize] = mandelbrot(x, y, iterations);
-        }
-    }
-
-    result
+    (res.0 * dim[0] + pos[0], res.1 * dim[1] + pos[1])
 }
 
 fn main() {
@@ -132,29 +118,18 @@ fn main() {
         Color::color_from_hsv(HUE, 1., x as f32 / 255.0)
     }).collect();
 
-    let mut canvas = [0; SIZE];
-
     while !rl.window_should_close() {
         c.update(&rl);
-        let mut threads: Vec<JoinHandle<[u8; T_SIZE]>> = Vec::new();
 
-        for i in 0..NO_THREADS {
-            let iterations = c.iterations;
-            threads.push(thread::spawn(move || {
-                calc_range(i as i32, iterations, c.dim, c.pos)
-            }));
-        }
-
-        for (t, thread) in threads.into_iter().enumerate() {
-            let res = thread.join().unwrap();
-
-            for i in 0..T_SIZE {
-                canvas[i + (t * T_SIZE)] = res[i];
-            }
-        }
+        let canvas = (0..HEIGHT)
+            .cartesian_product(0..WIDTH)
+            .collect_vec()
+            .into_par_iter()
+            .map(|(x, y)| pixel_to_real((y, x), c.dim, c.pos)).into_par_iter()
+            .map(|(x, y)| mandelbrot(x, y, c.iterations))
+            .collect::<Vec<u8>>();
 
         let mut d = rl.begin_drawing(&thread);
-        d.clear_background(Color::BLACK);
 
         for j in 0..HEIGHT {
             for i in 0..WIDTH {
@@ -163,7 +138,6 @@ fn main() {
                 d.draw_pixel(i, j, col);
             }
         }
-
 
         d.draw_text(&format!("Iterations: {}", c.iterations), 10, 10, 30,
                     Color::WHITE);

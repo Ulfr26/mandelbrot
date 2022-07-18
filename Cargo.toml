@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 raylib = { version = "3.7" }
+itertools = "0.10.3"
+rayon = "1.5"
 
 [profile.dev]
 opt-level = 3
