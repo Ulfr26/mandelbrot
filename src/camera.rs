@@ -1,5 +1,5 @@
-use raylib::prelude::*;
 use crate::*;
+use raylib::prelude::*;
 
 // Represents the position of the camera, and the dimensions of the viewport
 // (in the complex plane, not in pixel space)
@@ -10,10 +10,7 @@ pub struct Camera {
 
 impl Camera {
     fn new(dim: [f64; 2], pos: [f64; 2]) -> Camera {
-        Camera {
-            dim,
-            pos,
-        }
+        Camera { dim, pos }
     }
 
     pub fn update(&mut self, rl: &RaylibHandle) {
@@ -38,7 +35,9 @@ impl Camera {
         if scroll > 0 {
             self.dim[0] *= ZOOM;
             self.dim[1] *= ZOOM;
-        } else if scroll < 0 {
+        }
+
+        if scroll < 0 {
             self.dim[0] /= ZOOM;
             self.dim[1] /= ZOOM;
         }
