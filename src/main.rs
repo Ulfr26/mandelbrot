@@ -16,8 +16,6 @@ const SPEED: f64 = 200.0;
 const ZOOM: f64 = 0.9; // Sheogorath!
 const ITER_SPEED: i32 = 64; // Add this many iterations per button press
 
-
-
 // does ????
 // stolen from wikipedia
 fn mandelbrot(re: f64, im: f64, max_iterations: i32) -> u8 {
@@ -44,6 +42,14 @@ fn pixel_to_real(pixel: (i32, i32), dim: &[f64; 2], pos: &[f64; 2]) -> (f64, f64
     (res.0 * dim[0] + pos[0], res.1 * dim[1] + pos[1])
 }
 
+fn update_iterations(rl: &RaylibHandle, iterations: &mut i32) {
+    let change = rl.is_key_down(KeyboardKey::KEY_UP) as i32 
+        - rl.is_key_down(KeyboardKey::KEY_DOWN) as i32;
+
+    *iterations += change * ITER_SPEED;
+    *iterations = (*iterations).max(0);
+}
+
 fn main() {
     let (mut rl, thread) = raylib::init()
         .size(WIDTH, HEIGHT)
@@ -55,16 +61,18 @@ fn main() {
     let pallette: Vec<Color> = (0..256).map(|x| {
         Color::color_from_hsv(HUE, 1., x as f32 / 255.0)
     }).collect();
+    let mut iterations = MAX_ITERATIONS;
 
     while !rl.window_should_close() {
         camera.update(&rl);
+        update_iterations(&rl, &mut iterations);
 
         let canvas = (0..HEIGHT)
             .cartesian_product(0..WIDTH)
             .collect_vec()
             .into_par_iter()
             .map(|(x, y)| pixel_to_real((y, x), &camera.dim, &camera.pos))
-            .map(|(x, y)| mandelbrot(x, y, camera.iterations))
+            .map(|(x, y)| mandelbrot(x, y, iterations))
             .collect::<Vec<u8>>();
 
         let mut draw_handle = rl.begin_drawing(&thread);
@@ -77,7 +85,7 @@ fn main() {
             }
         }
 
-        draw_handle.draw_text(&format!("Iterations: {}", camera.iterations), 10, 10, 30,
+        draw_handle.draw_text(&format!("Iterations: {}", iterations), 10, 10, 30,
                     Color::WHITE);
         draw_handle.draw_fps(WIDTH - 100, 10);
     }
